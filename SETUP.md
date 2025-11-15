@@ -2,13 +2,41 @@
 
 This guide will help you install and configure Claude Code CLI on Windows 11.
 
+## Choose Your Setup Path
+
+**👉 Have Claude Pro or Max?**
+→ See [SETUP_PRO_USERS.md](SETUP_PRO_USERS.md) for a simplified guide
+
+**👉 Want to use API access?**
+→ Continue with this guide
+
+## Authentication Methods
+
+Claude Code supports two ways to authenticate:
+
+1. **Claude Pro/Max Subscription** (Browser login)
+   - Fixed monthly cost
+   - Authenticates via browser
+   - ~10-40 prompts per 5 hours
+   - Included with your subscription
+
+2. **API Key** (Pay-per-use)
+   - Pay per token
+   - Set via environment variable
+   - Higher context limits
+   - Better for heavy usage
+
+> **Warning:** API keys take priority! If you set an API key environment variable and have Pro, you'll be charged per token instead of using your subscription.
+
 ## Prerequisites
 
 1. **Windows 11** with administrator access
 2. **Node.js** (version 18 or higher)
 3. **npm** or **npx** (comes with Node.js)
 4. **PowerShell** or **Windows Terminal**
-5. **Anthropic API Key**
+5. **Either:**
+   - Claude Pro or Max subscription, **OR**
+   - Anthropic API Key
 
 ## Quick Start
 
