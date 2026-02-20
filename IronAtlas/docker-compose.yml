@@ -1,0 +1,213 @@
+version: "3.9"
+
+name: iron-atlas
+
+networks:
+  atlas-net:
+    driver: bridge
+
+services:
+  # -----------------------------
+  # Reverse proxy (front door)
+  # -----------------------------
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    networks: [atlas-net]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /IronAtlas/config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /IronAtlas/vault/caddy/data:/data
+      - /IronAtlas/vault/caddy/config:/config
+
+  # -----------------------------
+  # Minimal static frontend (landing page)
+  # -----------------------------
+  atlas-frontend:
+    image: nginx:alpine
+    container_name: atlas-frontend
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/config/frontend:/usr/share/nginx/html:ro
+    expose:
+      - "80"
+
+  # -----------------------------
+  # System status / uptime
+  # -----------------------------
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/uptime-kuma:/app/data
+    expose:
+      - "3001"
+
+  # -----------------------------
+  # Dashboard (Grafana)
+  # -----------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    networks: [atlas-net]
+    environment:
+      - GF_SECURITY_ADMIN_USER=IronAtlas
+      - GF_SECURITY_ADMIN_PASSWORD=RedDawn
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - /IronAtlas/vault/grafana:/var/lib/grafana
+    expose:
+      - "3000"
+
+  # -----------------------------
+  # MQTT (Meshtastic integration spine) — hardened: internal-only
+  # -----------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - /IronAtlas/config/mosquitto/passwordfile:/mosquitto/config/passwordfile:ro
+      - /IronAtlas/vault/mosquitto/data:/mosquitto/data
+      - /IronAtlas/vault/mosquitto/log:/mosquitto/log
+    expose:
+      - "1883"
+
+  # -----------------------------
+  # Node-RED (automation / alerting)
+  # -----------------------------
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    restart: unless-stopped
+    networks: [atlas-net]
+    environment:
+      - TZ=America/Los_Angeles
+    volumes:
+      - /IronAtlas/vault/node-red:/data
+    expose:
+      - "1880"
+    depends_on:
+      - mosquitto
+
+  # -----------------------------
+  # GPS ingestion (USB GPS -> standard feed)
+  # Use stable symlink /dev/ironatlas-gps via udev (Task 3)
+  # -----------------------------
+  gpsd:
+    image: ghcr.io/ccrisan/gpsd:latest
+    container_name: gpsd
+    restart: unless-stopped
+    networks: [atlas-net]
+    devices:
+      - /dev/ironatlas-gps:/dev/ironatlas-gps
+    environment:
+      - GPSD_OPTIONS=-n -G
+      - DEVICES=/dev/ironatlas-gps
+    expose:
+      - "2947"
+
+  # -----------------------------
+  # Offline tiles (MBTiles -> web map tiles)
+  # -----------------------------
+  tileserver-gl:
+    image: maptiler/tileserver-gl:latest
+    container_name: tileserver-gl
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/maps/mbtiles:/data:ro
+    expose:
+      - "8080"
+    command: ["--port", "8080", "--public_url", "/tiles/"]
+
+  # -----------------------------
+  # Offline routing (GraphHopper)
+  # Expects /IronAtlas/vault/maps/osm/conus.pbf (or replace with your extracts)
+  # -----------------------------
+  graphhopper:
+    image: israelhikingmap/graphhopper:latest
+    container_name: graphhopper
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/maps/osm:/data
+      - /IronAtlas/config/graphhopper/config.yml:/config/config.yml:ro
+    expose:
+      - "8989"
+    command: ["--config", "/config/config.yml"]
+
+  # -----------------------------
+  # SDR (browser spectrum UI) — optional, Tier 2 includes it
+  # Hardware mapping deferred; keep container but do not grant /dev/bus/usb by default
+  # -----------------------------
+  openwebrx:
+    image: jketterl/openwebrx:latest
+    container_name: openwebrx
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/openwebrx:/var/lib/openwebrx
+    expose:
+      - "8073"
+
+  # -----------------------------
+  # RAG appliance (already built) — mount whole rag-appliance directory
+  # NOTE: Replace image and internal port if needed; Caddy routes /rag to this service.
+  # -----------------------------
+  rag-appliance:
+    image: REPLACE_ME_RAG_IMAGE:latest # TBD by junior dev
+    container_name: rag-appliance
+    restart: unless-stopped
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/rag-appliance:/app
+    expose:
+      - "8000" # Adjust if your RAG listens elsewhere
+
+  # -----------------------------
+  # TAK server — placeholder
+  # Junior dev will select/build and fill in correct ports, volumes, env
+  # -----------------------------
+  tak-server:
+    image: REPLACE_ME_TAK_SERVER_IMAGE:latest # TBD
+    container_name: tak-server
+    restart: unless-stopped
+    profiles: ["tak"]
+    networks: [atlas-net]
+    volumes:
+      - /IronAtlas/vault/tak:/data
+    expose:
+      - "8087" # placeholder
+
+  # -----------------------------
+  # Meshtastic bridge — placeholder
+  # Junior dev will select/build; MUST use stable symlink /dev/ironatlas-mesh (Task 3)
+  # -----------------------------
+  meshtastic-bridge:
+    image: REPLACE_ME_MESHTASTIC_BRIDGE_IMAGE:latest # TBD
+    container_name: meshtastic-bridge
+    restart: unless-stopped
+    profiles: ["mesh"]
+    networks: [atlas-net]
+    depends_on:
+      - mosquitto
+    devices:
+      - /dev/ironatlas-mesh:/dev/ironatlas-mesh
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_USER=IronAtlas
+      - MQTT_PASS=RedDawn
+      - MESHTASTIC_DEVICE=/dev/ironatlas-mesh
+    volumes:
+      - /IronAtlas/vault/meshtastic:/data

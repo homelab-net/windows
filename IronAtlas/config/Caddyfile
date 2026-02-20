@@ -1,0 +1,58 @@
+{
+	# debug
+}
+
+:80 {
+
+	# Security headers (basic hardening)
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+	}
+
+	# Landing page (minimal static frontend)
+	route / {
+		reverse_proxy atlas-frontend:80
+	}
+
+	route /status* {
+		reverse_proxy uptime-kuma:3001
+	}
+
+	route /grafana* {
+		reverse_proxy grafana:3000
+	}
+
+	route /nodered* {
+		reverse_proxy node-red:1880
+	}
+
+	# TileServer GL is configured with public_url "/tiles/"
+	route /tiles* {
+		reverse_proxy tileserver-gl:8080
+	}
+
+	route /route* {
+		reverse_proxy graphhopper:8989
+	}
+
+	route /sdr* {
+		reverse_proxy openwebrx:8073
+	}
+
+	route /rag* {
+		reverse_proxy rag-appliance:8000
+	}
+
+	# Placeholders (enable once selected)
+	route /tak* {
+		reverse_proxy tak-server:8087
+	}
+	route /mesh* {
+		respond 200 "Mesh coming soon"
+	}
+
+	respond /healthz 200
+}

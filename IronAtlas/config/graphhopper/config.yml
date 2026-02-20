@@ -1,0 +1,15 @@
+graphhopper:
+  datareader.file: /data/conus.pbf
+  graph.location: /data/graph-cache
+  profiles:
+    - name: car
+      vehicle: car
+      weighting: fast
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+  admin_connectors:
+    - type: http
+      port: 8990
